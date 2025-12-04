@@ -213,7 +213,7 @@ MIT License
 
 ## Author
 
-Your Name
+Thanakorn Sin-on
 
 ## Acknowledgments
 
