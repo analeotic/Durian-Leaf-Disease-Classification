@@ -86,6 +86,7 @@ class Trainer:
         self.valid_losses = []
         self.valid_accuracies = []
         self.valid_f1_scores = []
+        self.valid_f1_macro_scores = []
 
     def train_epoch(self) -> float:
         """Train for one epoch"""
@@ -150,9 +151,10 @@ class Trainer:
 
         epoch_loss = running_loss / len(self.valid_loader.dataset)
         accuracy = accuracy_score(all_labels, all_preds)
-        f1 = f1_score(all_labels, all_preds, average='weighted')
+        f1_weighted = f1_score(all_labels, all_preds, average='weighted')
+        f1_macro = f1_score(all_labels, all_preds, average='macro')
 
-        return epoch_loss, accuracy, f1, all_preds, all_labels
+        return epoch_loss, accuracy, f1_weighted, f1_macro, all_preds, all_labels
 
     def save_checkpoint(self, epoch: int, val_loss: float, val_acc: float, is_best: bool = False):
         """Save model checkpoint"""
@@ -182,15 +184,17 @@ class Trainer:
             print('-' * 60)
 
             train_loss = self.train_epoch()
-            val_loss, val_acc, val_f1, _, _ = self.validate()
+            val_loss, val_acc, val_f1_weighted, val_f1_macro, _, _ = self.validate()
 
             self.train_losses.append(train_loss)
             self.valid_losses.append(val_loss)
             self.valid_accuracies.append(val_acc)
-            self.valid_f1_scores.append(val_f1)
+            self.valid_f1_scores.append(val_f1_weighted)
+            self.valid_f1_macro_scores.append(val_f1_macro)
 
             print(f'Train Loss: {train_loss:.4f}')
-            print(f'Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}, Val F1: {val_f1:.4f}')
+            print(f'Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}')
+            print(f'Val F1 (Weighted): {val_f1_weighted:.4f}, Val F1 (Macro): {val_f1_macro:.4f}')
 
             is_best = val_loss < best_val_loss
             if is_best:
@@ -213,32 +217,43 @@ class Trainer:
 
     def plot_training_history(self):
         """Plot training history"""
-        fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+        fig, axes = plt.subplots(2, 2, figsize=(15, 12))
 
-        axes[0].plot(self.train_losses, label='Train Loss')
-        axes[0].plot(self.valid_losses, label='Val Loss')
-        axes[0].set_xlabel('Epoch')
-        axes[0].set_ylabel('Loss')
-        axes[0].set_title('Training and Validation Loss')
-        axes[0].legend()
-        axes[0].grid(True)
+        # Loss plot
+        axes[0, 0].plot(self.train_losses, label='Train Loss')
+        axes[0, 0].plot(self.valid_losses, label='Val Loss')
+        axes[0, 0].set_xlabel('Epoch')
+        axes[0, 0].set_ylabel('Loss')
+        axes[0, 0].set_title('Training and Validation Loss')
+        axes[0, 0].legend()
+        axes[0, 0].grid(True)
 
-        axes[1].plot(self.valid_accuracies, label='Val Accuracy')
-        axes[1].set_xlabel('Epoch')
-        axes[1].set_ylabel('Accuracy')
-        axes[1].set_title('Validation Accuracy')
-        axes[1].legend()
-        axes[1].grid(True)
+        # Accuracy plot
+        axes[0, 1].plot(self.valid_accuracies, label='Val Accuracy', color='green')
+        axes[0, 1].set_xlabel('Epoch')
+        axes[0, 1].set_ylabel('Accuracy')
+        axes[0, 1].set_title('Validation Accuracy')
+        axes[0, 1].legend()
+        axes[0, 1].grid(True)
 
-        axes[2].plot(self.valid_f1_scores, label='Val F1 Score')
-        axes[2].set_xlabel('Epoch')
-        axes[2].set_ylabel('F1 Score')
-        axes[2].set_title('Validation F1 Score')
-        axes[2].legend()
-        axes[2].grid(True)
+        # F1 Score (Weighted) plot
+        axes[1, 0].plot(self.valid_f1_scores, label='Val F1 (Weighted)', color='orange')
+        axes[1, 0].set_xlabel('Epoch')
+        axes[1, 0].set_ylabel('F1 Score')
+        axes[1, 0].set_title('Validation F1 Score (Weighted)')
+        axes[1, 0].legend()
+        axes[1, 0].grid(True)
+
+        # F1 Score (Macro) plot
+        axes[1, 1].plot(self.valid_f1_macro_scores, label='Val F1 (Macro)', color='red')
+        axes[1, 1].set_xlabel('Epoch')
+        axes[1, 1].set_ylabel('F1 Score')
+        axes[1, 1].set_title('Validation F1 Score (Macro)')
+        axes[1, 1].legend()
+        axes[1, 1].grid(True)
 
         plt.tight_layout()
-        plt.savefig(os.path.join(self.checkpoint_dir, 'training_history.png'))
+        plt.savefig(os.path.join(self.checkpoint_dir, 'training_history.png'), dpi=100)
         plt.close()
 
 
@@ -356,11 +371,19 @@ def main():
     checkpoint = torch.load(best_model_path)
     model.load_state_dict(checkpoint['model_state_dict'])
 
-    val_loss, val_acc, val_f1, preds, labels = trainer.validate()
-    print(f'Best Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}, Val F1: {val_f1:.4f}')
+    val_loss, val_acc, val_f1_weighted, val_f1_macro, preds, labels = trainer.validate()
+    print(f'Best Val Loss: {val_loss:.4f}')
+    print(f'Val Accuracy: {val_acc:.4f}')
+    print(f'Val F1 (Weighted): {val_f1_weighted:.4f}')
+    print(f'Val F1 (Macro): {val_f1_macro:.4f}')
 
     print('\nClassification Report:')
-    print(classification_report(labels, preds))
+    print(classification_report(labels, preds, target_names=[
+        'Class 0: Healthy',
+        'Class 1: Worms & Beetles',
+        'Class 2: Fungal',
+        'Class 3: Aphids & Mites'
+    ]))
 
 
 if __name__ == '__main__':

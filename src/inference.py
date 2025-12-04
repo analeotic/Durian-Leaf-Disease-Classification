@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 import pandas as pd
 from tqdm import tqdm
 import argparse
+from sklearn.metrics import accuracy_score, f1_score, classification_report
 
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -55,6 +56,8 @@ def main():
                         help='Batch size for inference')
     parser.add_argument('--num_workers', type=int, default=4,
                         help='Number of data loading workers')
+    parser.add_argument('--validate', action='store_true',
+                        help='If true, compute metrics (requires labels in CSV)')
     args = parser.parse_args()
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -108,7 +111,36 @@ def main():
 
     # Show prediction distribution
     print('\nPrediction distribution:')
-    print(submission_df['predict'].value_counts().sort_index())
+    pred_counts = submission_df['predict'].value_counts().sort_index()
+    for class_id, count in pred_counts.items():
+        print(f'  Class {class_id}: {count} samples ({count/len(submission_df)*100:.1f}%)')
+
+    # If validation mode, compute metrics
+    if args.validate and 'label' in test_df.columns:
+        print('\n' + '='*60)
+        print('VALIDATION METRICS')
+        print('='*60)
+
+        # Get true labels
+        true_labels = test_df['label'].values
+
+        # Calculate metrics
+        accuracy = accuracy_score(true_labels, predictions)
+        f1_weighted = f1_score(true_labels, predictions, average='weighted')
+        f1_macro = f1_score(true_labels, predictions, average='macro')
+
+        print(f'\nAccuracy: {accuracy:.4f}')
+        print(f'F1 Score (Weighted): {f1_weighted:.4f}')
+        print(f'F1 Score (Macro): {f1_macro:.4f}')
+
+        print('\nClassification Report:')
+        print(classification_report(true_labels, predictions, target_names=[
+            'Class 0: Healthy',
+            'Class 1: Worms & Beetles',
+            'Class 2: Fungal',
+            'Class 3: Aphids & Mites'
+        ]))
+        print('='*60)
 
 
 if __name__ == '__main__':

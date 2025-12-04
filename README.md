@@ -129,6 +129,16 @@ Optional parameters:
 - `--model_name`: Model architecture (default: 'convnext_tiny')
 - `--batch_size`: Batch size for inference (default: 32)
 - `--image_size`: Input image size (default: 224)
+- `--validate`: Compute metrics if labels are available in CSV
+
+**Validation mode** (if you have labels in test CSV):
+```bash
+python src/inference.py \
+    --checkpoint checkpoints/best_model.pth \
+    --test_csv data/raw/train.csv \
+    --validate
+```
+This will show Accuracy, F1 Score (Weighted), F1 Score (Macro), and Classification Report.
 
 ### Model Loading (Python)
 
@@ -165,7 +175,29 @@ jupyter notebook notebooks/eda.ipynb
 After training, you'll find:
 - `checkpoints/best_model.pth`: Best model based on validation loss
 - `checkpoints/checkpoint_epoch_*.pth`: Epoch checkpoints
-- `checkpoints/training_history.png`: Training curves
+- `checkpoints/training_history.png`: Training curves (4 plots)
+  - Loss (train & validation)
+  - Accuracy
+  - F1 Score (Weighted)
+  - F1 Score (Macro)
+
+## Evaluation Metrics
+
+The model is evaluated using multiple metrics:
+
+1. **Accuracy**: Overall classification accuracy
+2. **F1 Score (Weighted)**: F1 score weighted by support (number of samples per class)
+   - Better for representing overall performance
+3. **F1 Score (Macro)**: F1 score averaged equally across all classes
+   - **More important for imbalanced datasets**
+   - Treats each class equally regardless of sample size
+   - Better indicator of model performance on minority classes
+4. **Classification Report**: Per-class precision, recall, and F1 scores
+
+**Why Macro F1 is Important:**
+- Dataset has class imbalance (Class 0: 41 samples vs Class 2: 87 samples)
+- Macro F1 ensures the model performs well on ALL classes, including minorities
+- Competition/production systems often care about minority class performance
 
 ## Requirements
 
